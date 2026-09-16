@@ -964,7 +964,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "qutebook"
+name = "qutemarks"
 version = "0.1.0"
 dependencies = [
  "anyhow",

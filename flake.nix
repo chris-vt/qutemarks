@@ -1,5 +1,5 @@
 {
-  description = "Rust dev environment for qutebook";
+  description = "Rust dev environment for qutemarks";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

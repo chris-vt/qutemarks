@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Bookmark - qutemarks</title>
+    <style>
+        body { font-family: monospace; background: #1a1b26; color: #a9b1d6; margin: 0; padding: 40px; max-width: 800px; margin: 0 auto; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #c0caf5; font-weight: bold; }
+        input[type="text"], textarea {
+            width: 100%; padding: 10px; background: #24283b; color: #c0caf5; border: 1px solid #414868; border-radius: 4px; box-sizing: border-box; font-family: monospace;
+        }
+        textarea { height: 120px; resize: vertical; }
+        .readonly { background: #1f2335 !important; color: #565f89 !important; border-color: #292e42 !important; cursor: not-allowed; }
+        .btn-group { display: flex; gap: 10px; margin-top: 30px; }
+        button, .btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-family: monospace; font-size: 1em; text-decoration: none; text-align: center; }
+        .btn-save { background: #9ece6a; color: #1a1b26; }
+        .btn-save:hover { background: #b9f27c; }
+        .btn-cancel { background: #414868; color: #c0caf5; }
+        .btn-cancel:hover { background: #565f89; }
+    </style>
+</head>
+<body>
+    <h1>Edit Bookmark</h1>
+    <form action="/edit/{{ bookmark.id }}" method="POST">
+        <div class="form-group">
+            <label>URL (Read-only)</label>
+            <input type="text" value="{{ bookmark.url }}" class="readonly" readonly>
+        </div>
+        <div class="form-group">
+            <label>Title</label>
+            <input type="text" name="title" value="{{ bookmark.title }}" required autofocus>
+        </div>
+        <div class="form-group">
+            <label>Tags (comma separated)</label>
+            <input type="text" name="tags" value="{{ bookmark.tags|join(", ") }}" placeholder="e.g. rust, programming, tech">
+        </div>
+        <div class="form-group">
+            <label>Notes / Description</label>
+            <textarea name="notes">{% match bookmark.notes %}{% when Some with (notes) %}{{ notes }}{% when None %}{% endmatch %}</textarea>
+        </div>
+        <div class="btn-group">
+            <button type="submit" class="btn-save">Save Changes</button>
+            <a href="/" class="btn btn-cancel">Cancel</a>
+        </div>
+    </form>
+</body>
+</html>

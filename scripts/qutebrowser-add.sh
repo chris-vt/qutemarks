@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# bkmrkd userscript for qutebrowser
+# qutemarks userscript for qutebrowser
 # Adds the current page to the local bookmark manager.
 
 if [ -z "$QUTE_URL" ]; then

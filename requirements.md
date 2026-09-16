@@ -1,4 +1,4 @@
-# Requirements Specification: Local Bookmark Manager (`bkmrkd`)
+# Requirements Specification: Local Bookmark Manager (`qutemarks`)
 
 ## 1. Executive Summary
 
@@ -98,5 +98,5 @@ Edit:      Inline edit / modal -> Update title, path, tags, description -> Async
 
 Following XDG base directory standards:
 
-* **Database location:** `$XDG_DATA_HOME/bkmrkd/bookmarks.db` (fallback `~/.local/share/bkmrkd/bookmarks.db`)
-* **Server configuration:** `$XDG_CONFIG_HOME/bkmrkd/config.toml` (bind port, host interface default `127.0.0.1:8080`)
+* **Database location:** `$XDG_DATA_HOME/qutemarks/bookmarks.db` (fallback `~/.local/share/qutemarks/bookmarks.db`)
+* **Server configuration:** `$XDG_CONFIG_HOME/qutemarks/config.toml` (bind port, host interface default `127.0.0.1:8080`)
