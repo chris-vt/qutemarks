@@ -52,8 +52,8 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/", get(index))
         .route("/api/bookmarks", post(create_bookmark))
-        .route("/edit/:id", get(edit_page))
-        .route("/edit/:id", post(update_bookmark))
+        .route("/edit/{id}", get(edit_page))
+        .route("/edit/{id}", post(update_bookmark))
         .with_state(pool);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
