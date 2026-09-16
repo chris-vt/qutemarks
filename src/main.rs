@@ -16,7 +16,8 @@ mod db;
 #[template(path = "index.html")]
 struct IndexTemplate {
     bookmarks: Vec<db::Bookmark>,
-    all_tags: Vec<String>,
+    has_untagged: bool,
+    normal_tags: Vec<String>,
 }
 
 #[derive(Template)]
@@ -67,7 +68,11 @@ async fn main() -> anyhow::Result<()> {
 async fn index(State(pool): State<sqlx::SqlitePool>) -> impl IntoResponse {
     let bookmarks = db::get_all_bookmarks(&pool).await.unwrap_or_default();
     let all_tags = db::get_all_tags(&pool).await.unwrap_or_default();
-    let template = IndexTemplate { bookmarks, all_tags };
+    
+    let has_untagged = all_tags.contains(&"untagged".to_string());
+    let normal_tags = all_tags.into_iter().filter(|t| t != "untagged").collect();
+    
+    let template = IndexTemplate { bookmarks, has_untagged, normal_tags };
     match template.render() {
         Ok(html) => Html(html).into_response(),
         Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Template error: {}", err)).into_response(),

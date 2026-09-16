@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>qutemarks</title>
+    <title>qutemarks - Dashboard</title>
     <style>
         body { 
             font-family: monospace; background: #1a1b26; color: #a9b1d6; 
@@ -31,16 +31,22 @@
         }
         .tag-pill.active { background: #7aa2f7; color: #1a1b26; }
         
+        .untagged-pill {
+            background: #1f2335; border: 1px solid #3b4261; color: #7aa2f7; font-weight: bold;
+        }
+        .untagged-pill.active { background: #3b4261; color: #c0caf5; border-color: #7aa2f7; }
+        
         .bookmark { 
             background: #24283b; padding: 15px; margin-bottom: 12px; 
             border-radius: 4px; border-left: 4px solid #bb9af7; 
-            display: grid; grid-template-columns: 2.25fr 4.75fr 1.5fr; gap: 20px; align-items: start;
+            display: grid; grid-template-columns: 2.25fr 4fr 1.5fr 80px; gap: 20px; align-items: start;
             min-height: 80px; box-sizing: border-box; border-right: 1px solid #414868; border-top: 1px solid #414868; border-bottom: 1px solid #414868;
         }
         
         .col-main { display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
         .col-notes { display: flex; flex-direction: column; overflow: hidden; }
-        .col-meta { display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
+        .col-tags { display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start; justify-content: flex-start; }
+        .col-actions { display: flex; justify-content: flex-end; align-items: flex-start; }
         
         .bookmark .title { 
             font-size: 1.1em; font-weight: bold; 
@@ -56,13 +62,13 @@
             white-space: pre-wrap;
         }
         
-        .bookmark-tags { display: flex; flex-wrap: wrap; justify-content: flex-end; }
-        .bookmark-tags .tag-pill { cursor: default; background: #292e42; font-size: 0.8em; padding: 3px 8px; margin-bottom: 4px; }
+        .bookmark .tag-pill { cursor: default; background: #292e42; font-size: 0.8em; padding: 3px 8px; margin: 0; }
+        .bookmark .untagged-pill { background: #1f2335; border: 1px solid #3b4261; color: #565f89; }
         
         .edit-btn {
             background: #3b4261; color: #c0caf5; border: none; padding: 6px 16px; border-radius: 4px;
             cursor: pointer; text-decoration: none; font-size: 0.85em; text-align: center;
-            transition: background 0.2s;
+            transition: background 0.2s; white-space: nowrap;
         }
         .edit-btn:hover { background: #7aa2f7; color: #1a1b26; text-decoration: none; }
         
@@ -76,10 +82,17 @@
             <div class="tags-pane">
                 <h3>Tags</h3>
                 <div id="filter-tags">
-                    {% for tag in all_tags %}
+                    {% if has_untagged %}
+                    <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #414868;">
+                        <span class="tag-pill untagged-pill" data-tag="untagged">untagged</span>
+                    </div>
+                    {% endif %}
+                    
+                    {% for tag in normal_tags %}
                     <span class="tag-pill" data-tag="{{ tag }}">{{ tag }}</span>
                     {% endfor %}
-                    {% if all_tags.is_empty() %}
+                    
+                    {% if !has_untagged && normal_tags.is_empty() %}
                     <span style="font-size: 0.85em; color: #565f89;">No tags yet.</span>
                     {% endif %}
                 </div>
@@ -93,13 +106,13 @@
                 {% for b in bookmarks %}
                 <div class="bookmark search-target" data-tags="{{ b.tags|join(",") }}">
                     
-                    <!-- Section 1: Title and URL -->
+                    <!-- Column 1: Title and URL -->
                     <div class="col-main">
                         <div class="title"><a href="{{ b.url }}">{{ b.title }}</a></div>
                         <div class="url" title="{{ b.url }}">{{ b.domain() }}</div>
                     </div>
                     
-                    <!-- Section 2: Notes / Description -->
+                    <!-- Column 2: Notes / Description -->
                     <div class="col-notes">
                         {% match b.notes %}
                             {% when Some with (notes) %}
@@ -108,15 +121,21 @@
                         {% endmatch %}
                     </div>
                     
-                    <!-- Section 3: Tags and Edit -->
-                    <div class="col-meta">
-                        <div class="bookmark-tags">
-                            {% for tag in b.tags %}
-                            {% if !tag.is_empty() %}
-                            <span class="tag-pill">{{ tag }}</span>
+                    <!-- Column 3: Tags -->
+                    <div class="col-tags">
+                        {% for tag in b.tags %}
+                        {% if !tag.is_empty() %}
+                            {% if tag == "untagged" %}
+                                <span class="tag-pill untagged-pill">{{ tag }}</span>
+                            {% else %}
+                                <span class="tag-pill">{{ tag }}</span>
                             {% endif %}
-                            {% endfor %}
-                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    
+                    <!-- Column 4: Edit Button -->
+                    <div class="col-actions">
                         <a href="/edit/{{ b.id }}" class="edit-btn">Edit</a>
                     </div>
                     
@@ -145,7 +164,6 @@
             const term = searchInput.value.toLowerCase();
             
             bookmarks.forEach(b => {
-                // Search across the main column (title) and notes column
                 const titleText = b.querySelector('.col-main').innerText.toLowerCase();
                 const notesEl = b.querySelector('.col-notes');
                 const notesText = notesEl ? notesEl.innerText.toLowerCase() : "";
