@@ -21,6 +21,16 @@ impl Bookmark {
             self.url.clone()
         }
     }
+
+    pub fn condensed_notes(&self) -> Option<String> {
+        self.notes.as_ref().map(|n| {
+            n.split('\n')
+                .map(|s| s.trim_end())
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+    }
 }
 
 #[derive(sqlx::FromRow)]
