@@ -1,1 +1,20 @@
-/target
+# Rust/Cargo build artifacts (These get huge and are machine-specific)
+/target/
+
+# Local Database
+bookmarks.db
+bookmarks.db-shm
+bookmarks.db-wal
+
+# Nix build symlinks
+result
+result-*
+
+# Local developer environment variables & caches
+.direnv/
+.envrc
+
+# Editor/OS temporary files
+*.swp
+*.bak
+.DS_Store
