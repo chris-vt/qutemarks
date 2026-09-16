@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>bkmrkd - Dashboard</title>
+    <style>
+        body { 
+            font-family: monospace; 
+            background: #1a1b26; 
+            color: #a9b1d6; 
+            margin: 0; 
+            padding: 20px; 
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        a { color: #7aa2f7; text-decoration: none; }
+        a:hover { text-decoration: underline; background: #292e42; }
+        .search-bar { 
+            width: 100%; 
+            padding: 12px; 
+            margin-bottom: 20px; 
+            background: #24283b; 
+            color: #c0caf5; 
+            border: 1px solid #414868;
+            font-size: 1.1em;
+            box-sizing: border-box;
+        }
+        .bookmark { 
+            background: #24283b; 
+            padding: 15px; 
+            margin-bottom: 10px; 
+            border-radius: 4px; 
+            border-left: 4px solid #bb9af7; 
+        }
+        .bookmark .title { font-size: 1.2em; font-weight: bold; margin-bottom: 5px; }
+        .bookmark .url { font-size: 0.9em; color: #565f89; margin-bottom: 8px; }
+        .bookmark .notes { font-size: 0.9em; color: #9ece6a; }
+        .keyboard-shortcuts {
+            font-size: 0.8em;
+            color: #565f89;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>bkmrkd (/bookmarks)</h1>
+    <div class="keyboard-shortcuts">
+        Press <strong>'/'</strong> or <strong>'s'</strong> to focus search. Native hints (<strong>'f'</strong> in qutebrowser) work directly on links.
+    </div>
+    
+    <input type="text" class="search-bar" placeholder="Fuzzy search bookmarks..." id="search" autofocus>
+    
+    <div id="bookmarks-list">
+        {% for b in bookmarks %}
+        <div class="bookmark">
+            <div class="title"><a href="{{ b.url }}">{{ b.title }}</a></div>
+            <div class="url">{{ b.url }}</div>
+            {% match b.notes %}
+                {% when Some with (notes) %}
+                    <div class="notes">{{ notes }}</div>
+                {% when None %}
+            {% endmatch %}
+        </div>
+        {% endfor %}
+        {% if bookmarks.is_empty() %}
+        <div class="bookmark">
+            <div class="title">No bookmarks found.</div>
+            <div class="notes">Start capturing using the API endpoint!</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        // Hotkey binding for search focus
+        document.addEventListener('keydown', function(e) {
+            if (e.key === '/' || e.key === 's') {
+                if (document.activeElement !== document.getElementById('search')) {
+                    e.preventDefault();
+                    document.getElementById('search').focus();
+                }
+            }
+        });
+
+        // Client-side fuzzy search filter
+        document.getElementById('search').addEventListener('input', function(e) {
+            const term = e.target.value.toLowerCase();
+            const bookmarks = document.querySelectorAll('.bookmark');
+            bookmarks.forEach(b => {
+                const text = b.innerText.toLowerCase();
+                if (text.includes(term)) {
+                    b.style.display = 'block';
+                } else {
+                    b.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
