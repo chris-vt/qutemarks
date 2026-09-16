@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Bookmark {
     pub id: i64,
     pub folder_id: Option<i64>,
@@ -95,8 +95,7 @@ pub async fn init_db(pool: &SqlitePool) -> anyhow::Result<()> {
 }
 
 pub async fn get_all_bookmarks(pool: &SqlitePool) -> anyhow::Result<Vec<Bookmark>> {
-    let bookmarks = sqlx::query_as!(
-        Bookmark,
+    let bookmarks = sqlx::query_as::<_, Bookmark>(
         "SELECT id, folder_id, url, title, notes, created_at, updated_at FROM bookmarks ORDER BY created_at DESC"
     )
     .fetch_all(pool)
