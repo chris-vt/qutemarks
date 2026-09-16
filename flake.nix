@@ -12,6 +12,17 @@
         pkgs = import nixpkgs { inherit system; };
       in
       {
+        packages.default = pkgs.rustPlatform.buildRustPackage {
+          pname = "qutemarks";
+          version = "0.1.0";
+          src = ./.;
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+          };
+          buildInputs = with pkgs; [ pkg-config openssl ];
+          nativeBuildInputs = with pkgs; [ pkg-config ];
+        };
+
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             cargo
