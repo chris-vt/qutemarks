@@ -102,3 +102,30 @@ pub async fn get_all_bookmarks(pool: &SqlitePool) -> anyhow::Result<Vec<Bookmark
     .await?;
     Ok(bookmarks)
 }
+
+pub async fn add_bookmark(pool: &SqlitePool, url: &str, title: &str, notes: Option<&str>) -> anyhow::Result<()> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs() as i64;
+    
+    // Insert new bookmark, or update it if the URL already exists
+    sqlx::query(
+        r#"
+        INSERT INTO bookmarks (url, title, notes, created_at, updated_at) 
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(url) DO UPDATE SET 
+            title = excluded.title, 
+            notes = excluded.notes, 
+            updated_at = excluded.updated_at
+        "#
+    )
+    .bind(url)
+    .bind(title)
+    .bind(notes)
+    .bind(now)
+    .bind(now)
+    .execute(pool)
+    .await?;
+    
+    Ok(())
+}

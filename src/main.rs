@@ -1,10 +1,12 @@
 use askama::Template;
 use axum::{
     extract::State,
+    http::StatusCode,
     response::{Html, IntoResponse},
-    routing::get,
-    Router,
+    routing::{get, post},
+    Json, Router,
 };
+use serde::Deserialize;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::str::FromStr;
 
@@ -30,6 +32,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/", get(index))
+        .route("/api/bookmarks", post(create_bookmark))
         .with_state(pool);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
@@ -49,5 +52,22 @@ async fn index(State(pool): State<sqlx::SqlitePool>) -> impl IntoResponse {
             format!("Template error: {}", err),
         )
             .into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+struct CreateBookmark {
+    url: String,
+    title: String,
+    notes: Option<String>,
+}
+
+async fn create_bookmark(
+    State(pool): State<sqlx::SqlitePool>,
+    Json(payload): Json<CreateBookmark>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    match db::add_bookmark(&pool, &payload.url, &payload.title, payload.notes.as_deref()).await {
+        Ok(_) => Ok(StatusCode::CREATED),
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
     }
 }
