@@ -13,6 +13,16 @@ pub struct Bookmark {
     pub tags: Vec<String>,
 }
 
+impl Bookmark {
+    pub fn domain(&self) -> String {
+        if let Ok(parsed) = url::Url::parse(&self.url) {
+            parsed.host_str().unwrap_or(&self.url).to_string()
+        } else {
+            self.url.clone()
+        }
+    }
+}
+
 #[derive(sqlx::FromRow)]
 struct BookmarkRow {
     id: i64,
@@ -127,7 +137,9 @@ pub async fn get_all_bookmarks(pool: &SqlitePool) -> anyhow::Result<Vec<Bookmark
 }
 
 pub async fn get_all_tags(pool: &SqlitePool) -> anyhow::Result<Vec<String>> {
-    let tags: Vec<(String,)> = sqlx::query_as("SELECT name FROM tags ORDER BY name ASC")
+    let tags: Vec<(String,)> = sqlx::query_as(
+        "SELECT DISTINCT t.name FROM tags t JOIN bookmark_tags bt ON t.id = bt.tag_id ORDER BY t.name ASC"
+    )
         .fetch_all(pool)
         .await?;
     Ok(tags.into_iter().map(|(name,)| name).collect())
