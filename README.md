@@ -29,11 +29,25 @@ inputs = {
 };
 ```
 
-2. Add the package to your system or user packages:
+2. Add the package to your system packages and configure a background user service:
 ```nix
-environment.systemPackages = [
-  inputs.qutemarks.packages.${pkgs.system}.default
-];
+{ config, pkgs, inputs, ... }: {
+  environment.systemPackages = [
+    inputs.qutemarks.packages.${pkgs.system}.default
+  ];
+
+  # Autolaunch qutemarks in the background
+  systemd.user.services.qutemarks = {
+    description = "Qutemarks background service for qutebrowser";
+    wantedBy = [ "graphical-session.target" ];
+    partOf = [ "graphical-session.target" ];
+    serviceConfig = {
+      ExecStart = "${inputs.qutemarks.packages.${pkgs.system}.default}/bin/qutemarks";
+      Restart = "on-failure";
+      RestartSec = 5;
+    };
+  };
+}
 ```
 
 ## Setup & Configuration
@@ -62,6 +76,6 @@ config.bind(',B', 'open http://localhost:8338')
 
 ## Usage
 
-1. **Start the server**: Run `qutemarks` (or `cargo run` in development). The server binds to `127.0.0.1:8338` by default and will automatically initialize its SQLite database on first run.
-2. **Save a link**: While browsing in qutebrowser, press `,b`. A native notification will appear confirming the bookmark was saved.
+1. **Server**: Because of the `systemd` user service configured above, the server binds to `127.0.0.1:8338` in the background when you log in. It automatically initializes its SQLite database on first run.
+2. **Save a link**: While browsing in qutebrowser, press `,b`. A native notification will appear confirming the bookmark was saved to the local server.
 3. **Organize**: Press `,B` to instantly jump to your local dashboard where you can edit descriptions, assign tags, and search your collection.
