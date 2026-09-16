@@ -18,6 +18,7 @@
             rustc
             rustfmt
             rustPackages.clippy
+            cargo-watch
             pkg-config
             openssl
           ];

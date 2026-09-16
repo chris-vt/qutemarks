@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Bookmark {
     pub id: i64,
     pub folder_id: Option<i64>,
@@ -10,6 +10,38 @@ pub struct Bookmark {
     pub notes: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
+    pub tags: Vec<String>,
+}
+
+#[derive(sqlx::FromRow)]
+struct BookmarkRow {
+    id: i64,
+    folder_id: Option<i64>,
+    url: String,
+    title: String,
+    notes: Option<String>,
+    created_at: i64,
+    updated_at: i64,
+    tags_string: Option<String>,
+}
+
+impl From<BookmarkRow> for Bookmark {
+    fn from(row: BookmarkRow) -> Self {
+        let tags = row
+            .tags_string
+            .map(|s| s.split(',').map(String::from).collect())
+            .unwrap_or_default();
+        Self {
+            id: row.id,
+            folder_id: row.folder_id,
+            url: row.url,
+            title: row.title,
+            notes: row.notes,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            tags,
+        }
+    }
 }
 
 pub async fn init_db(pool: &SqlitePool) -> anyhow::Result<()> {
@@ -58,49 +90,66 @@ pub async fn init_db(pool: &SqlitePool) -> anyhow::Result<()> {
         .await?;
 
     if count.0 == 0 {
-        // Insert sample folders
-        sqlx::query(
-            r#"
-            INSERT INTO folders (name, path) VALUES ('Tech', '/tech');
-            INSERT INTO folders (name, path) VALUES ('News', '/news');
-            "#,
-        )
-        .execute(pool)
-        .await?;
+        sqlx::query("INSERT INTO tags (name) VALUES ('untagged'), ('rust'), ('browser')").execute(pool).await?;
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs() as i64;
 
-        // Insert sample bookmarks
         sqlx::query(
-            r#"
-            INSERT INTO bookmarks (folder_id, url, title, notes, created_at, updated_at)
-            VALUES 
-            (1, 'https://github.com/qutebrowser/qutebrowser', 'qutebrowser - github', 'Keyboard-driven browser', ?, ?),
-            (1, 'https://doc.rust-lang.org/book/', 'The Rust Programming Language', 'Official Rust Book', ?, ?),
-            (2, 'https://news.ycombinator.com', 'Hacker News', 'Tech news', ?, ?),
-            (1, 'https://htmx.org', 'htmx - high power tools for HTML', 'Frontend library for MVP', ?, ?);
-            "#,
-        )
-        .bind(now).bind(now)
-        .bind(now).bind(now)
-        .bind(now).bind(now)
-        .bind(now).bind(now)
-        .execute(pool)
-        .await?;
+            "INSERT INTO bookmarks (id, folder_id, url, title, notes, created_at, updated_at) VALUES 
+            (1, NULL, 'https://github.com/qutebrowser/qutebrowser', 'qutebrowser - github', 'Keyboard-driven browser', ?, ?),
+            (2, NULL, 'https://doc.rust-lang.org/book/', 'The Rust Programming Language', 'Official Rust Book', ?, ?);"
+        ).bind(now).bind(now).bind(now).bind(now).execute(pool).await?;
+
+        sqlx::query("INSERT INTO bookmark_tags (bookmark_id, tag_id) VALUES (1, 3), (2, 2)").execute(pool).await?;
     }
 
     Ok(())
 }
 
 pub async fn get_all_bookmarks(pool: &SqlitePool) -> anyhow::Result<Vec<Bookmark>> {
-    let bookmarks = sqlx::query_as::<_, Bookmark>(
-        "SELECT id, folder_id, url, title, notes, created_at, updated_at FROM bookmarks ORDER BY created_at DESC"
+    let rows = sqlx::query_as::<_, BookmarkRow>(
+        r#"
+        SELECT b.id, b.folder_id, b.url, b.title, b.notes, b.created_at, b.updated_at,
+               GROUP_CONCAT(t.name, ',') as tags_string
+        FROM bookmarks b
+        LEFT JOIN bookmark_tags bt ON b.id = bt.bookmark_id
+        LEFT JOIN tags t ON bt.tag_id = t.id
+        GROUP BY b.id
+        ORDER BY b.created_at DESC
+        "#
     )
     .fetch_all(pool)
     .await?;
-    Ok(bookmarks)
+    
+    Ok(rows.into_iter().map(Into::into).collect())
+}
+
+pub async fn get_all_tags(pool: &SqlitePool) -> anyhow::Result<Vec<String>> {
+    let tags: Vec<(String,)> = sqlx::query_as("SELECT name FROM tags ORDER BY name ASC")
+        .fetch_all(pool)
+        .await?;
+    Ok(tags.into_iter().map(|(name,)| name).collect())
+}
+
+pub async fn get_bookmark(pool: &SqlitePool, id: i64) -> anyhow::Result<Option<Bookmark>> {
+    let row = sqlx::query_as::<_, BookmarkRow>(
+        r#"
+        SELECT b.id, b.folder_id, b.url, b.title, b.notes, b.created_at, b.updated_at,
+               GROUP_CONCAT(t.name, ',') as tags_string
+        FROM bookmarks b
+        LEFT JOIN bookmark_tags bt ON b.id = bt.bookmark_id
+        LEFT JOIN tags t ON bt.tag_id = t.id
+        WHERE b.id = ?
+        GROUP BY b.id
+        "#
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+    
+    Ok(row.map(Into::into))
 }
 
 pub async fn add_bookmark(pool: &SqlitePool, url: &str, title: &str, notes: Option<&str>) -> anyhow::Result<()> {
@@ -108,7 +157,9 @@ pub async fn add_bookmark(pool: &SqlitePool, url: &str, title: &str, notes: Opti
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs() as i64;
     
-    // Insert new bookmark, or update it if the URL already exists
+    let mut tx = pool.begin().await?;
+
+    // Insert or update bookmark
     sqlx::query(
         r#"
         INSERT INTO bookmarks (url, title, notes, created_at, updated_at) 
@@ -119,13 +170,57 @@ pub async fn add_bookmark(pool: &SqlitePool, url: &str, title: &str, notes: Opti
             updated_at = excluded.updated_at
         "#
     )
-    .bind(url)
-    .bind(title)
-    .bind(notes)
-    .bind(now)
-    .bind(now)
-    .execute(pool)
+    .bind(url).bind(title).bind(notes).bind(now).bind(now)
+    .execute(&mut *tx)
     .await?;
+
+    let bookmark_id: (i64,) = sqlx::query_as("SELECT id FROM bookmarks WHERE url = ?")
+        .bind(url)
+        .fetch_one(&mut *tx)
+        .await?;
     
+    // Ensure "untagged" tag exists and get ID
+    sqlx::query("INSERT OR IGNORE INTO tags (name) VALUES ('untagged')").execute(&mut *tx).await?;
+    let tag_id: (i64,) = sqlx::query_as("SELECT id FROM tags WHERE name = 'untagged'").fetch_one(&mut *tx).await?;
+
+    // Assign "untagged" if it has NO tags at all
+    let count: (i64,) = sqlx::query_as("SELECT count(*) FROM bookmark_tags WHERE bookmark_id = ?")
+        .bind(bookmark_id.0)
+        .fetch_one(&mut *tx).await?;
+        
+    if count.0 == 0 {
+        sqlx::query("INSERT INTO bookmark_tags (bookmark_id, tag_id) VALUES (?, ?)")
+            .bind(bookmark_id.0)
+            .bind(tag_id.0)
+            .execute(&mut *tx)
+            .await?;
+    }
+
+    tx.commit().await?;
+    Ok(())
+}
+
+pub async fn update_bookmark(pool: &SqlitePool, id: i64, title: &str, notes: Option<&str>, tags: Vec<String>) -> anyhow::Result<()> {
+    let mut tx = pool.begin().await?;
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64;
+
+    sqlx::query("UPDATE bookmarks SET title = ?, notes = ?, updated_at = ? WHERE id = ?")
+        .bind(title).bind(notes).bind(now).bind(id)
+        .execute(&mut *tx).await?;
+
+    // Clear old tags
+    sqlx::query("DELETE FROM bookmark_tags WHERE bookmark_id = ?").bind(id).execute(&mut *tx).await?;
+
+    for tag in tags {
+        let tag = tag.trim().to_lowercase();
+        if tag.is_empty() { continue; }
+        sqlx::query("INSERT OR IGNORE INTO tags (name) VALUES (?)").bind(&tag).execute(&mut *tx).await?;
+        let tag_id: (i64,) = sqlx::query_as("SELECT id FROM tags WHERE name = ?").bind(&tag).fetch_one(&mut *tx).await?;
+        
+        sqlx::query("INSERT INTO bookmark_tags (bookmark_id, tag_id) VALUES (?, ?)")
+            .bind(id).bind(tag_id.0).execute(&mut *tx).await?;
+    }
+
+    tx.commit().await?;
     Ok(())
 }

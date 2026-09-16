@@ -1,10 +1,10 @@
 use askama::Template;
 use axum::{
-    extract::State,
+    extract::{Path, State},
     http::StatusCode,
-    response::{Html, IntoResponse},
+    response::{Html, IntoResponse, Redirect},
     routing::{get, post},
-    Json, Router,
+    Json, Form, Router,
 };
 use serde::Deserialize;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
@@ -16,23 +16,44 @@ mod db;
 #[template(path = "index.html")]
 struct IndexTemplate {
     bookmarks: Vec<db::Bookmark>,
+    all_tags: Vec<String>,
+}
+
+#[derive(Template)]
+#[template(path = "edit.html")]
+struct EditTemplate {
+    bookmark: db::Bookmark,
+}
+
+#[derive(Deserialize)]
+struct CreateBookmark {
+    url: String,
+    title: String,
+    notes: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct EditBookmarkForm {
+    title: String,
+    tags: String,
+    notes: String,
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    // Setup SQLite DB
     let db_url = "sqlite://bookmarks.db";
     let options = SqliteConnectOptions::from_str(db_url)?.create_if_missing(true);
     let pool = SqlitePoolOptions::new().connect_with(options).await?;
 
-    // Initialize Schema and Seed Fake Data
     db::init_db(&pool).await?;
 
     let app = Router::new()
         .route("/", get(index))
         .route("/api/bookmarks", post(create_bookmark))
+        .route("/edit/:id", get(edit_page))
+        .route("/edit/:id", post(update_bookmark))
         .with_state(pool);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
@@ -44,22 +65,12 @@ async fn main() -> anyhow::Result<()> {
 
 async fn index(State(pool): State<sqlx::SqlitePool>) -> impl IntoResponse {
     let bookmarks = db::get_all_bookmarks(&pool).await.unwrap_or_default();
-    let template = IndexTemplate { bookmarks };
+    let all_tags = db::get_all_tags(&pool).await.unwrap_or_default();
+    let template = IndexTemplate { bookmarks, all_tags };
     match template.render() {
         Ok(html) => Html(html).into_response(),
-        Err(err) => (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Template error: {}", err),
-        )
-            .into_response(),
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Template error: {}", err)).into_response(),
     }
-}
-
-#[derive(Deserialize)]
-struct CreateBookmark {
-    url: String,
-    title: String,
-    notes: Option<String>,
 }
 
 async fn create_bookmark(
@@ -69,5 +80,34 @@ async fn create_bookmark(
     match db::add_bookmark(&pool, &payload.url, &payload.title, payload.notes.as_deref()).await {
         Ok(_) => Ok(StatusCode::CREATED),
         Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+    }
+}
+
+async fn edit_page(
+    State(pool): State<sqlx::SqlitePool>,
+    Path(id): Path<i64>,
+) -> impl IntoResponse {
+    if let Ok(Some(bookmark)) = db::get_bookmark(&pool, id).await {
+        let template = EditTemplate { bookmark };
+        match template.render() {
+            Ok(html) => Html(html).into_response(),
+            Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Template error: {}", err)).into_response(),
+        }
+    } else {
+        (StatusCode::NOT_FOUND, "Bookmark not found").into_response()
+    }
+}
+
+async fn update_bookmark(
+    State(pool): State<sqlx::SqlitePool>,
+    Path(id): Path<i64>,
+    Form(form): Form<EditBookmarkForm>,
+) -> impl IntoResponse {
+    let tags: Vec<String> = form.tags.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+    let notes = if form.notes.trim().is_empty() { None } else { Some(form.notes.as_str()) };
+    
+    match db::update_bookmark(&pool, id, &form.title, notes, tags).await {
+        Ok(_) => Redirect::to("/").into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
