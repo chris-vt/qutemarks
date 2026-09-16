@@ -99,4 +99,4 @@ Edit:      Inline edit / modal -> Update title, path, tags, description -> Async
 Following XDG base directory standards:
 
 * **Database location:** `$XDG_DATA_HOME/qutemarks/bookmarks.db` (fallback `~/.local/share/qutemarks/bookmarks.db`)
-* **Server configuration:** `$XDG_CONFIG_HOME/qutemarks/config.toml` (bind port, host interface default `127.0.0.1:8080`)
+* **Server configuration:** `$XDG_CONFIG_HOME/qutemarks/config.toml` (bind port, host interface default `127.0.0.1:8338`)

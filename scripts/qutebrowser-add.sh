@@ -16,7 +16,7 @@ PAYLOAD=$(cat <<JSON
 JSON
 )
 
-RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d "$PAYLOAD" http://127.0.0.1:8080/api/bookmarks)
+RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d "$PAYLOAD" http://127.0.0.1:8338/api/bookmarks)
 
 if [ "$RESPONSE" -eq 201 ]; then
     echo "message-info 'Bookmark saved: $QUTE_TITLE'" >> "$QUTE_FIFO"

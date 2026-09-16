@@ -58,7 +58,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/delete/{id}", post(delete_bookmark))
         .with_state(pool);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:8338").await?;
     tracing::info!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await?;
 
