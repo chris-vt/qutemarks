@@ -45,5 +45,9 @@
             <a href="/" class="btn btn-cancel">Cancel</a>
         </div>
     </form>
+    
+    <form action="/delete/{{ bookmark.id }}" method="POST" style="margin-top: -46px; margin-left: 280px;" onsubmit="return confirm('Are you sure you want to delete this bookmark?');">
+        <button type="submit" class="btn" style="background: #f7768e; color: #1a1b26;">Delete</button>
+    </form>
 </body>
 </html>

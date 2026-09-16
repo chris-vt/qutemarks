@@ -54,6 +54,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/bookmarks", post(create_bookmark))
         .route("/edit/{id}", get(edit_page))
         .route("/edit/{id}", post(update_bookmark))
+        .route("/delete/{id}", post(delete_bookmark))
         .with_state(pool);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
@@ -107,6 +108,16 @@ async fn update_bookmark(
     let notes = if form.notes.trim().is_empty() { None } else { Some(form.notes.as_str()) };
     
     match db::update_bookmark(&pool, id, &form.title, notes, tags).await {
+        Ok(_) => Redirect::to("/").into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn delete_bookmark(
+    State(pool): State<sqlx::SqlitePool>,
+    Path(id): Path<i64>,
+) -> impl IntoResponse {
+    match db::delete_bookmark(&pool, id).await {
         Ok(_) => Redirect::to("/").into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }

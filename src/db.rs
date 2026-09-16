@@ -236,3 +236,11 @@ pub async fn update_bookmark(pool: &SqlitePool, id: i64, title: &str, notes: Opt
     tx.commit().await?;
     Ok(())
 }
+
+pub async fn delete_bookmark(pool: &SqlitePool, id: i64) -> anyhow::Result<()> {
+    let mut tx = pool.begin().await?;
+    sqlx::query("DELETE FROM bookmark_tags WHERE bookmark_id = ?").bind(id).execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM bookmarks WHERE id = ?").bind(id).execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(())
+}
