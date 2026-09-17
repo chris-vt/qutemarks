@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>qutemarks - start page</title>
+    <style>
+        body {
+            font-family: monospace;
+            background-color: #1e1e2e;
+            color: #cdd6f4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            padding: 20px;
+            text-align: center;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 30px;
+        }
+        .card-container {
+            position: relative;
+        }
+        .card {
+            background-color: #313244;
+            padding: 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            color: #89b4fa;
+            font-size: 1.2rem;
+            transition: background-color 0.2s;
+            display: block;
+        }
+        .card:hover {
+            background-color: #45475a;
+        }
+        .delete-form {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            display: none;
+        }
+        .card-container:hover .delete-form {
+            display: block;
+        }
+        .delete-btn {
+            background: #f38ba8;
+            color: #11111b;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.8rem;
+            padding: 0;
+            line-height: 20px;
+            text-align: center;
+        }
+        form.add-pin {
+            margin-top: 50px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        input {
+            padding: 8px;
+            border: 1px solid #45475a;
+            border-radius: 4px;
+            background: #181825;
+            color: #cdd6f4;
+        }
+        button.add-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #89b4fa;
+            color: #11111b;
+            font-weight: bold;
+        }
+        button.add-btn:hover {
+            background: #b4befe;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>qutemarks</h1>
+        <div class="grid">
+            {% for pin in pins %}
+            <div class="card-container">
+                <a href="{{ pin.url }}" class="card">
+                    {{ pin.title }}
+                </a>
+                <form class="delete-form" action="/start/delete/{{ pin.id }}" method="post">
+                    <button type="submit" class="delete-btn" title="Delete">X</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+
+        <form class="add-pin" action="/start/add" method="post">
+            <input type="text" name="title" placeholder="Title (e.g. YouTube)" required>
+            <input type="url" name="url" placeholder="https://..." required>
+            <button type="submit" class="add-btn">Add Pin</button>
+        </form>
+    </div>
+</body>
+</html>

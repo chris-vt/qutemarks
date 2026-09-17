@@ -97,6 +97,10 @@
                     {% endif %}
                 </div>
             </div>
+            
+            <div style="margin-top: 20px;">
+                <a href="/settings" style="display: block; padding: 10px; background: #24283b; text-align: center; border-radius: 4px; border: 1px solid #414868;">⚙ Settings</a>
+            </div>
         </div>
         
         <div class="main-content">
@@ -104,7 +108,7 @@
             
             <div id="bookmarks-list">
                 {% for b in bookmarks %}
-                <div class="bookmark search-target" data-tags="{{ b.tags|join(",") }}">
+                <div class="bookmark search-target" data-tags="{{ b.tags|join(",") }}" {% for tag in b.tags %}{% if tag.starts_with("@") %}style="display: none;"{% endif %}{% endfor %}>
                     
                     <!-- Column 1: Title and URL -->
                     <div class="col-main">
@@ -172,9 +176,15 @@
                 const bTags = b.getAttribute('data-tags').split(',');
                 
                 const matchesText = text.includes(term);
-                const matchesTags = activeTags.size === 0 || Array.from(activeTags).every(t => bTags.includes(t));
                 
-                b.style.display = (matchesText && matchesTags) ? 'grid' : 'none';
+                // Normal tag matching: must have all active tags
+                const matchesNormalTags = activeTags.size === 0 || Array.from(activeTags).every(t => bTags.includes(t));
+                
+                // Hidden tag matching: if the bookmark has any tag starting with '@', 
+                // that specific tag MUST be actively selected to show the bookmark.
+                const hasUnselectedHiddenTag = bTags.some(t => t.startsWith('@') && !activeTags.has(t));
+                
+                b.style.display = (matchesText && matchesNormalTags && !hasUnselectedHiddenTag) ? 'grid' : 'none';
             });
         }
 
@@ -193,6 +203,9 @@
                 filterBookmarks();
             });
         });
+        
+        // Run initially to enforce hiding of @ tags on page load
+        filterBookmarks();
     </script>
 </body>
 </html>
