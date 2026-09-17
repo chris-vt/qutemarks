@@ -7,9 +7,12 @@ A lightning-fast, local-first bookmark manager designed as a companion for quteb
 ## Features
 
 - **Seamless Ingestion**: Captures the current page's title and URL directly from qutebrowser via a custom userscript.
-- **Responsive Dashboard**: A minimal, fast, multi-column CSS-grid UI for quickly reading and managing saved links.
+- **Responsive Dashboard**: A minimal, fast, multi-column CSS-grid UI for quickly reading and managing saved links, sorted perfectly alphabetically.
+- **Start / Landing Page**: A customizable, clean new-tab page (`/start`) where you can pin and organize your most frequently visited URLs.
+- **Hidden / Private Tags**: Any tag prefixed with `@` (e.g., `@private`) is strictly hidden from the dashboard and search results by default, and is only revealed when you explicitly select it.
 - **Fuzzy Searching**: Instant client-side fuzzy searching across titles, URLs, and notes.
-- **Dynamic Tagging**: Filter bookmarks by tags with a single click. Uncategorized links are automatically flagged as `untagged` for easy triaging.
+- **Dynamic Tagging**: Filter bookmarks by tags with a single click. Links stripped of all tags are automatically flagged as `untagged` for easy triaging.
+- **Data Portability & Backups**: Import HTML bookmarks from Chrome/Firefox, export to CSV/HTML, or use the proprietary `.qutemarks` format for perfect, lossless database backups.
 - **Local First**: Powered by an embedded SQLite database. Zero cloud accounts, zero telemetry, full ownership of your data.
 
 ## Prerequisites
@@ -49,15 +52,19 @@ cp scripts/qutebrowser-add.sh ~/.local/share/qutebrowser/userscripts/qutebrowser
 chmod +x ~/.local/share/qutebrowser/userscripts/qutebrowser-add.sh
 ```
 
-### 2. Qutebrowser Keybindings
-Add the following bindings to your qutebrowser config (e.g., inside `config.py`):
+### 2. Qutebrowser Config & Keybindings
+Add the following bindings and settings to your qutebrowser config (e.g., inside `config.py`):
 
 ```python
+# Use the qutemarks landing page for new empty tabs and startup
+c.url.default_page = 'http://localhost:8338/start'
+c.url.start_pages = ['http://localhost:8338/start']
+
 # Send current page to qutemarks
 config.bind(',b', 'spawn --userscript qutebrowser-add.sh')
 
-# Open the qutemarks dashboard
-config.bind(',B', 'open http://localhost:8338')
+# Open the main qutemarks dashboard
+config.bind(',B', 'open -t http://localhost:8338')
 ```
 
 ## Usage
@@ -65,3 +72,4 @@ config.bind(',B', 'open http://localhost:8338')
 1. **Start the server**: Run `qutemarks` (or `cargo run` in development). The server binds to `127.0.0.1:8338` by default and will automatically initialize its SQLite database on first run.
 2. **Save a link**: While browsing in qutebrowser, press `,b`. A native notification will appear confirming the bookmark was saved.
 3. **Organize**: Press `,B` to instantly jump to your local dashboard where you can edit descriptions, assign tags, and search your collection.
+4. **Settings & Backups**: Click the **⚙ Settings** button in the bottom left of the dashboard to manage imports, exports, and `.qutemarks` lossless backups.

@@ -99,6 +99,13 @@ pub async fn init_db(pool: &SqlitePool) -> anyhow::Result<()> {
             FOREIGN KEY (bookmark_id) REFERENCES bookmarks(id),
             FOREIGN KEY (tag_id) REFERENCES tags(id)
         );
+
+        CREATE TABLE IF NOT EXISTS pinned_urls (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            url TEXT NOT NULL UNIQUE,
+            title TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+        );
         "#,
     )
     .execute(pool)
@@ -137,7 +144,7 @@ pub async fn get_all_bookmarks(pool: &SqlitePool) -> anyhow::Result<Vec<Bookmark
         LEFT JOIN bookmark_tags bt ON b.id = bt.bookmark_id
         LEFT JOIN tags t ON bt.tag_id = t.id
         GROUP BY b.id
-        ORDER BY b.created_at DESC
+        ORDER BY b.title COLLATE NOCASE ASC
         "#
     )
     .fetch_all(pool)
@@ -243,6 +250,17 @@ pub async fn update_bookmark(pool: &SqlitePool, id: i64, title: &str, notes: Opt
             .bind(id).bind(tag_id.0).execute(&mut *tx).await?;
     }
 
+    let count: (i64,) = sqlx::query_as("SELECT count(*) FROM bookmark_tags WHERE bookmark_id = ?")
+        .bind(id)
+        .fetch_one(&mut *tx).await?;
+        
+    if count.0 == 0 {
+        sqlx::query("INSERT OR IGNORE INTO tags (name) VALUES ('untagged')").execute(&mut *tx).await?;
+        let tag_id: (i64,) = sqlx::query_as("SELECT id FROM tags WHERE name = 'untagged'").fetch_one(&mut *tx).await?;
+        sqlx::query("INSERT INTO bookmark_tags (bookmark_id, tag_id) VALUES (?, ?)")
+            .bind(id).bind(tag_id.0).execute(&mut *tx).await?;
+    }
+
     tx.commit().await?;
     Ok(())
 }
@@ -251,6 +269,92 @@ pub async fn delete_bookmark(pool: &SqlitePool, id: i64) -> anyhow::Result<()> {
     let mut tx = pool.begin().await?;
     sqlx::query("DELETE FROM bookmark_tags WHERE bookmark_id = ?").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM bookmarks WHERE id = ?").bind(id).execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct PinnedUrl {
+    pub id: i64,
+    pub url: String,
+    pub title: String,
+    pub created_at: i64,
+}
+
+pub async fn get_all_pins(pool: &SqlitePool) -> anyhow::Result<Vec<PinnedUrl>> {
+    let rows = sqlx::query_as::<_, PinnedUrl>(
+        r#"
+        SELECT id, url, title, created_at
+        FROM pinned_urls
+        ORDER BY created_at ASC
+        "#
+    )
+    .fetch_all(pool)
+    .await?;
+    
+    Ok(rows)
+}
+
+pub async fn add_pin(pool: &SqlitePool, url: &str, title: &str) -> anyhow::Result<()> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs() as i64;
+
+    sqlx::query(
+        r#"
+        INSERT INTO pinned_urls (url, title, created_at) 
+        VALUES (?, ?, ?)
+        ON CONFLICT(url) DO UPDATE SET title = excluded.title
+        "#
+    )
+    .bind(url)
+    .bind(title)
+    .bind(now)
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn delete_pin(pool: &SqlitePool, id: i64) -> anyhow::Result<()> {
+    sqlx::query("DELETE FROM pinned_urls WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn restore_bookmark(pool: &SqlitePool, b: &Bookmark) -> anyhow::Result<()> {
+    let mut tx = pool.begin().await?;
+
+    sqlx::query(
+        r#"
+        INSERT INTO bookmarks (id, url, title, notes, created_at, updated_at) 
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET 
+            url = excluded.url,
+            title = excluded.title, 
+            notes = excluded.notes, 
+            created_at = excluded.created_at,
+            updated_at = excluded.updated_at
+        "#
+    )
+    .bind(b.id).bind(&b.url).bind(&b.title).bind(&b.notes).bind(b.created_at).bind(b.updated_at)
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query("DELETE FROM bookmark_tags WHERE bookmark_id = ?").bind(b.id).execute(&mut *tx).await?;
+
+    for tag in &b.tags {
+        let tag = tag.trim().to_lowercase();
+        if tag.is_empty() { continue; }
+        sqlx::query("INSERT OR IGNORE INTO tags (name) VALUES (?)").bind(&tag).execute(&mut *tx).await?;
+        let tag_id: (i64,) = sqlx::query_as("SELECT id FROM tags WHERE name = ?").bind(&tag).fetch_one(&mut *tx).await?;
+        
+        sqlx::query("INSERT INTO bookmark_tags (bookmark_id, tag_id) VALUES (?, ?)")
+            .bind(b.id).bind(tag_id.0).execute(&mut *tx).await?;
+    }
+
     tx.commit().await?;
     Ok(())
 }

@@ -11,6 +11,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::str::FromStr;
 
 mod db;
+mod settings;
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -40,6 +41,18 @@ struct EditBookmarkForm {
     notes: String,
 }
 
+#[derive(Template)]
+#[template(path = "start.html")]
+struct StartTemplate {
+    pins: Vec<db::PinnedUrl>,
+}
+
+#[derive(Deserialize)]
+struct AddPinForm {
+    url: String,
+    title: String,
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
@@ -56,6 +69,16 @@ async fn main() -> anyhow::Result<()> {
         .route("/edit/{id}", get(edit_page))
         .route("/edit/{id}", post(update_bookmark))
         .route("/delete/{id}", post(delete_bookmark))
+        .route("/start", get(start_page))
+        .route("/start/add", post(add_pin))
+        .route("/start/delete/{id}", post(delete_pin))
+        .route("/settings", get(settings::settings_page))
+        .route("/settings/export/csv", get(settings::export_csv))
+        .route("/settings/export/html", get(settings::export_html))
+        .route("/settings/backup", get(settings::backup_qutemarks))
+        .route("/settings/restore", post(settings::restore_qutemarks))
+        .route("/settings/import", post(settings::import_html))
+        .route("/settings/delete-all", post(settings::delete_all))
         .with_state(pool);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8338").await?;
@@ -124,6 +147,35 @@ async fn delete_bookmark(
 ) -> impl IntoResponse {
     match db::delete_bookmark(&pool, id).await {
         Ok(_) => Redirect::to("/").into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn start_page(State(pool): State<sqlx::SqlitePool>) -> impl IntoResponse {
+    let pins = db::get_all_pins(&pool).await.unwrap_or_default();
+    let template = StartTemplate { pins };
+    match template.render() {
+        Ok(html) => Html(html).into_response(),
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Template error: {}", err)).into_response(),
+    }
+}
+
+async fn add_pin(
+    State(pool): State<sqlx::SqlitePool>,
+    Form(form): Form<AddPinForm>,
+) -> impl IntoResponse {
+    match db::add_pin(&pool, &form.url, &form.title).await {
+        Ok(_) => Redirect::to("/start").into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn delete_pin(
+    State(pool): State<sqlx::SqlitePool>,
+    Path(id): Path<i64>,
+) -> impl IntoResponse {
+    match db::delete_pin(&pool, id).await {
+        Ok(_) => Redirect::to("/start").into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
